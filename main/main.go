@@ -32,28 +32,34 @@ type song struct {
 
 var songs []song
 
-func checkError(err error) {
+func checkErrorAndExit(err error) {
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func checkErrorAndPass(err error) {
+	if err != nil {
+		log.Print(err)
 	}
 }
 
 func init() {
 	fmt.Println(colorRed + "Initializing songs" + colorReset)
 	err := os.Chdir("songs")
-	checkError(err)
+	checkErrorAndExit(err)
 
 	files, err := os.ReadDir(".")
-	checkError(err)
+	checkErrorAndExit(err)
 
 	i := 0
 	for _, file := range files {
 		fileInfo, err := os.Stat(file.Name())
-		checkError(err)
+		checkErrorAndExit(err)
 
 		if !fileInfo.IsDir() {
 			file, err := os.Open(file.Name())
-			checkError(err)
+			checkErrorAndExit(err)
 
 			m, err := tag.ReadFrom(file)
 			if err == nil {
@@ -116,41 +122,45 @@ func getSongs(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, songs)
 }
 
-func getSong(c *gin.Context) song {
+func getSong(c *gin.Context) (song, error) {
 	param := c.Param("param")
 
 	var song song
+	var err error
 	if id, err := strconv.Atoi(param); err == nil {
 		song, err = retrieveFile("", id)
-		checkError(err)
+		checkErrorAndPass(err)
 	} else {
 		song, err = retrieveFile(param, -1)
 		if err != nil {
 			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
-			checkError(err)
+			checkErrorAndPass(err)
 		}
 	}
 
-	return song
+	return song, err
 }
 
-func readSongContents(song song) []byte {
+func readSongContents(song song) ([]byte, error) {
 	fname := "../songs/" + song.Title + "." + song.FileType
 	file, err := os.Open(fname)
-	checkError(err)
+	checkErrorAndPass(err)
 
 	ctn, err := io.ReadAll(file)
-	checkError(err)
+	checkErrorAndPass(err)
 
-	return ctn
+	return ctn, err
 }
 
 func playSong(c *gin.Context) {
-	song := getSong(c)
+	song, err := getSong(c)
+	checkErrorAndExit(err)
 
 	connPool := audiopipeline.NewConnectionPool()
 
-	go audiopipeline.Stream(connPool, readSongContents(song), float32(song.Length))
+	bytes, err := readSongContents(song)
+	
+	go audiopipeline.Stream(connPool, bytes, float32(song.Length))
 
 	audiopipeline.PlayAudiofile(connPool, song.FileType, c)
 }
@@ -161,8 +171,12 @@ func main() {
 
 	// get song via title or id
 	router.GET("/songs/:param", func(c *gin.Context) {
-		song := getSong(c)
-		c.IndentedJSON(http.StatusOK, song)
+		song, err := getSong(c)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
+		} else {
+			c.IndentedJSON(http.StatusOK, song)
+		}
 	})
 
 	// play song via title or id
