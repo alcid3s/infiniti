@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"CNDAPI/audiopipeline"
@@ -31,30 +32,28 @@ type song struct {
 
 var songs []song
 
+func checkError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func init() {
 	fmt.Println(colorRed + "Initializing songs" + colorReset)
 	err := os.Chdir("songs")
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkError(err)
 
 	files, err := os.ReadDir(".")
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkError(err)
 
 	i := 0
 	for _, file := range files {
 		fileInfo, err := os.Stat(file.Name())
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkError(err)
 
 		if !fileInfo.IsDir() {
 			file, err := os.Open(file.Name())
-			if err != nil {
-				log.Fatal(err)
-			}
+			checkError(err)
 
 			m, err := tag.ReadFrom(file)
 			if err == nil {
@@ -96,15 +95,16 @@ func calculateTrackLength(file *os.File) float64 {
 	return t
 }
 
-func retrieveFile(name string) (song, error) {
+func retrieveFile(name string, id int) (song, error) {
+	toLower := func(s string) string {
+		return strings.ToLower(strings.ReplaceAll(s, " ", ""))
+	}
+
 	for _, song := range songs {
-
-		// sets strings to lowercase and removes whitespaces so that the comparison is case-insensitive
-		sTitle := strings.ToLower(strings.ReplaceAll(song.Title, " ", ""))
-		name = strings.ToLower(strings.ReplaceAll(name, " ", ""))
-
-		// check if the song exists in the database
-		if strings.EqualFold(sTitle, name) {
+		if name != "" && toLower(song.Title) == toLower(name) {
+			return song, nil
+		}
+		if id != -1 && song.Id == id {
 			return song, nil
 		}
 	}
@@ -116,83 +116,57 @@ func getSongs(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, songs)
 }
 
-func getSongByTitle(c *gin.Context) {
-	title := c.Param("title")
-	song, err := retrieveFile(title)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
-		return
+func getSong(c *gin.Context) song {
+	param := c.Param("param")
+
+	var song song
+	if id, err := strconv.Atoi(param); err == nil {
+		song, err = retrieveFile("", id)
+		checkError(err)
+	} else {
+		song, err = retrieveFile(param, -1)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
+			checkError(err)
+		}
 	}
 
-	c.IndentedJSON(http.StatusOK, song)
+	return song
 }
 
-func readFileContents(song song) []byte {
+func readSongContents(song song) []byte {
 	fname := "../songs/" + song.Title + "." + song.FileType
 	file, err := os.Open(fname)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkError(err)
 
 	ctn, err := io.ReadAll(file)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkError(err)
 
 	return ctn
 }
 
 func playSong(c *gin.Context) {
-	title := c.Param("title")
-	song, err := retrieveFile(title)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
-		return
-	}
+	song := getSong(c)
 
 	connPool := audiopipeline.NewConnectionPool()
 
-	go audiopipeline.Stream(connPool, readFileContents(song), float32(song.Length))
+	go audiopipeline.Stream(connPool, readSongContents(song), float32(song.Length))
 
-	w := c.Writer
-
-	r := c.Request
-
-	w.Header().Add("Content-Type", "audio/"+song.FileType)
-	w.Header().Add("Connection", "keep-alive")
-
-	flusher, ok := w.(http.Flusher)
-
-	if !ok {
-		log.Println("Could not create flusher")
-	}
-
-	connection := audiopipeline.MakeConnection()
-	connPool.AddConnection(connection)
-	log.Printf("%s has connected to the audio stream\n", r.Host)
-
-	fileName := song.Title + "." + song.FileType
-	fmt.Println("Playing: ", fileName)
-
-	for {
-		// Receive data from the buffer channel
-		bufferChannel, buffer := audiopipeline.GetConnectionBuffers(connection)
-		buf := <-bufferChannel
-		if _, err := w.Write(buf); err != nil {
-			connPool.DeleteConnection(connection)
-			log.Printf("%s's connection to the audio stream has been closed\\n", r.Host)
-			return
-		}
-		flusher.Flush()
-		clear(buffer)
-	}
+	audiopipeline.PlayAudiofile(connPool, song.FileType, c)
 }
 
 func main() {
 	router := gin.Default()
 	router.GET("/songs", getSongs)
-	router.GET("/songs/:title", getSongByTitle)
-	router.GET("/play/:title", playSong)
+
+	// get song via title or id
+	router.GET("/songs/:param", func(c *gin.Context) {
+		song := getSong(c)
+		c.IndentedJSON(http.StatusOK, song)
+	})
+
+	// play song via title or id
+	router.GET("/play/:param", playSong)
 
 	router.Run("localhost:8080")
 }

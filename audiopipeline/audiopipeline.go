@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -72,8 +74,8 @@ func Stream(connectionPool *ConnectionPool, content []byte, track_length float32
 		ticker := time.NewTicker(time.Millisecond * DELAY)
 
 		if track_length != 0.0 {
-			timer := time.Duration(float32(time.Millisecond) * float32(track_length*float32(BUFFERSIZE)/float32(len(content))))
-			log.Printf("Time: %v, Track Length: %v, Buffer Size: %v, Content Length: %v, time.Millisecond * DELAY: %v", timer, track_length, BUFFERSIZE, len(content), time.Millisecond*DELAY)
+			timer := time.Duration(float32(time.Millisecond) * float32(track_length*float32(BUFFERSIZE)/float32(len(content))) * 2)
+			// log.Printf("Time: %v, Track Length: %v, Buffer Size: %v, Content Length: %v, time.Millisecond * DELAY: %v", timer, track_length, BUFFERSIZE, len(content), time.Millisecond*DELAY)
 			ticker = time.NewTicker(timer)
 		}
 
@@ -89,42 +91,42 @@ func Stream(connectionPool *ConnectionPool, content []byte, track_length float32
 	}
 }
 
-func HandleStream(w http.ResponseWriter, r *http.Request, connPool *ConnectionPool) {
-
-	w.Header().Add("Content-Type", "audio/aac")
-	w.Header().Add("Connection", "keep-alive")
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-
-		log.Println("Could not create flusher")
-
-	}
-
-	connection := &Connection{bufferChannel: make(chan []byte), buffer: make([]byte, BUFFERSIZE)}
-	connPool.AddConnection(connection)
-	log.Printf("%s has connected to the audio stream\n", r.Host)
-
-	for {
-
-		buf := <-connection.bufferChannel
-		if _, err := w.Write(buf); err != nil {
-
-			connPool.DeleteConnection(connection)
-			log.Printf("%s's connection to the audio stream has been closed\n", r.Host)
-			return
-
-		}
-		flusher.Flush()
-		clear(connection.buffer)
-
-	}
-}
-
 func MakeConnection() *Connection {
 	return &Connection{bufferChannel: make(chan []byte), buffer: make([]byte, BUFFERSIZE)}
 }
 
 func GetConnectionBuffers(conn *Connection) (chan []byte, []byte) {
 	return conn.bufferChannel, conn.buffer
+}
+
+func PlayAudiofile(connPool *ConnectionPool, filetype string, c *gin.Context) {
+	w := c.Writer
+
+	r := c.Request
+
+	w.Header().Add("Content-Type", "audio/"+filetype)
+	w.Header().Add("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+
+	if !ok {
+		log.Println("Could not create flusher")
+	}
+
+	connection := MakeConnection()
+	connPool.AddConnection(connection)
+	log.Printf("%s has connected to the audio stream\n", r.Host)
+
+	for {
+		// Receive data from the buffer channel
+		bufferChannel, buffer := GetConnectionBuffers(connection)
+		buf := <-bufferChannel
+		if _, err := w.Write(buf); err != nil {
+			connPool.DeleteConnection(connection)
+			log.Printf("%s's connection to the audio stream has been closed\\n", r.Host)
+			return
+		}
+		flusher.Flush()
+		clear(buffer)
+	}
 }
