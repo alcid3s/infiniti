@@ -3,10 +3,10 @@ module CNDAPI/main
 go 1.22.0
 
 require (
-	CNDAPI/audiopipeline v0.0.0-00010101000000-000000000000
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/gin-gonic/gin v1.9.1
 	github.com/tcolgate/mp3 v0.0.0-20170426193717-e79c5a46d300
+	infiniti/audiopipeline v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -36,4 +36,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace CNDAPI/audiopipeline => ../audiopipeline
+replace infiniti/audiopipeline => ../audiopipeline

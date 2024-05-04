@@ -15,3 +15,5 @@
 # vendor/
 
 *.mp3
+
+*.code-workspace
