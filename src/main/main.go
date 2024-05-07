@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,27 +10,14 @@ import (
 	"strings"
 
 	"infiniti/audiopipeline"
+	"infiniti/database"
 
-	"github.com/dhowden/tag"
 	"github.com/gin-gonic/gin"
 	"github.com/tcolgate/mp3"
+	"gorm.io/gorm"
 )
 
-const (
-	colorReset = "\033[0m"
-	colorRed   = "\033[31m"
-)
-
-type song struct {
-	Id       int         `json:"id"`
-	Title    string      `json:"title"`
-	FileType string      `json:"fileType"`
-	Artist   string      `json:"artist"`
-	Length   float64     `json:"length"`
-	Image    tag.Picture `json:"image"`
-}
-
-var songs []song
+var db *gorm.DB
 
 const PORT = "9000"
 
@@ -47,45 +33,42 @@ func checkErrorAndPass(err error) {
 	}
 }
 
-func init() {
-	fmt.Println(colorRed + "Initializing songs" + colorReset)
-	err := os.Chdir("../songs")
-	checkErrorAndExit(err)
-
-	files, err := os.ReadDir(".")
-	checkErrorAndExit(err)
-
-	i := 0
-	for _, file := range files {
-		fileInfo, err := os.Stat(file.Name())
-		checkErrorAndExit(err)
-
-		if !fileInfo.IsDir() {
-			file, err := os.Open(file.Name())
-			checkErrorAndExit(err)
-
-			m, err := tag.ReadFrom(file)
-			if err == nil {
-				songs = append(songs, song{
-					Id:       i,
-					Title:    strings.Split(file.Name(), ".")[0],
-					FileType: strings.Split(file.Name(), ".")[1],
-					Artist:   m.Artist(),
-					Length:   calculateTrackLength(file),
-					Image:    *m.Picture(),
-				})
-			}
-		}
-		i++
+func checkErrorAndReturn(err error, c *gin.Context, message string) {
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": message})
+		return
 	}
 }
 
+func init() {
+	file, err := os.Open("credentials.txt")
+	checkErrorAndExit(err)
+
+	contents, err := io.ReadAll(file)
+	checkErrorAndExit(err)
+
+	credentials := strings.Split(string(contents), ":")
+
+	db, err = database.Connect(credentials[0], credentials[1], credentials[2])
+	checkErrorAndExit(err)
+	database.Migrate(db)
+	database.Seed(db, "../songs")
+}
+
 // source: https://stackoverflow.com/questions/60281655/how-to-find-the-length-of-mp3-file-in-golang
-func calculateTrackLength(file *os.File) float64 {
-	d := mp3.NewDecoder(file)
+func calculatePlayLength(path string) float64 {
+	t := 0.0
+
+	r, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return 0.0
+	}
+
+	d := mp3.NewDecoder(r)
 	var f mp3.Frame
 	skipped := 0
-	t := 0.0
+
 	for {
 
 		if err := d.Decode(&f, &skipped); err != nil {
@@ -98,58 +81,39 @@ func calculateTrackLength(file *os.File) float64 {
 
 		t = t + f.Duration().Seconds()
 	}
-
-	if t == 0.0 {
-		log.Print(colorRed + "Couldn't calculate track length" + colorReset)
-	}
 	return t
 }
 
-func retrieveFile(name string, id int) (song, error) {
-	makeComparable := func(s string) string {
-		return strings.ToLower(strings.ReplaceAll(s, " ", ""))
-	}
-
-	for _, song := range songs {
-		if name != "" && makeComparable(song.Title) == makeComparable(name) {
-			return song, nil
-		}
-		if id != -1 && song.Id == id {
-			return song, nil
-		}
-	}
-
-	return song{}, errors.New("song not found")
-}
-
-func getSongs(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, songs)
-}
-
-func getSong(c *gin.Context) (song, error) {
+func getSong(c *gin.Context) (database.Song, error) {
 	param := c.Param("param")
 
-	var song song
-	var err error
-	if id, err := strconv.Atoi(param); err == nil {
-		song, err = retrieveFile("", id)
-		checkErrorAndPass(err)
-	} else {
-		song, err = retrieveFile(param, -1)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
-			checkErrorAndPass(err)
+	id, succes := strconv.Atoi(param)
+	if succes == nil {
+		song, err := database.GetSongById(db, id)
+		if err == nil {
+			return *song, nil
 		}
+		return database.Song{}, err
+	} else {
+		songs, err := database.GetSongByTitle(db, param)
+		if err == nil && len(songs) > 0 {
+			return songs[0], nil
+		}
+		err = fmt.Errorf("song not found")
+		return database.Song{}, err
 	}
 
-	return song, err
 }
 
-func readSongContents(song song) ([]byte, error) {
-	fname := "../songs/" + song.Title + "." + song.FileType
+func openFile(song database.Song) (*os.File, error) {
+	fname := "../songs/" + song.Path
 	file, err := os.Open(fname)
 	checkErrorAndPass(err)
 
+	return file, err
+}
+
+func readSongContents(file *os.File) ([]byte, error) {
 	ctn, err := io.ReadAll(file)
 	checkErrorAndPass(err)
 
@@ -158,21 +122,55 @@ func readSongContents(song song) ([]byte, error) {
 
 func playSong(c *gin.Context) {
 	song, err := getSong(c)
-	checkErrorAndExit(err)
+	checkErrorAndReturn(err, c, "song not found")
 
 	connPool := audiopipeline.NewConnectionPool()
 
-	bytes, err := readSongContents(song)
-	checkErrorAndExit(err)
+	file, err := openFile(song)
+	checkErrorAndReturn(err, c, "Couldn't open file of song")
+
+	bytes, err := readSongContents(file)
+	checkErrorAndReturn(err, c, "Couldn't read song contents")
 
 	// create a go routine to stream the song
-	go audiopipeline.Stream(connPool, bytes, float32(song.Length))
+	go audiopipeline.Stream(connPool, bytes, float32(calculatePlayLength("../songs/"+song.Path)))
 
-	audiopipeline.PlayAudiofile(connPool, song.FileType, c, song.Image.Data)
+	audiopipeline.PlayAudiofile(connPool, song.FileType, c)
+}
+
+func getSongs(c *gin.Context) {
+	var songs = database.GetSongs(db)
+	if songs != nil {
+		c.IndentedJSON(http.StatusOK, songs)
+	} else {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "Such empty"})
+	}
+}
+
+func removeSong(c *gin.Context) {
+	song, err := getSong(c)
+	checkErrorAndExit(err)
+	database.RemoveSong(db, song)
+}
+
+func uploadSong(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	checkErrorAndExit(err)
+
+	err = c.SaveUploadedFile(fileHeader, "../songs/"+fileHeader.Filename)
+	checkErrorAndExit(err)
+
+	file, err := os.Open(fileHeader.Filename)
+	checkErrorAndExit(err)
+
+	database.ParseFileToSongDatatype(db, file)
+
+	c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", fileHeader.Filename))
 }
 
 func main() {
 	router := gin.Default()
+	router.MaxMultipartMemory = 8 << 20
 	router.GET("/songs", getSongs)
 
 	// get song via title or id
@@ -188,5 +186,9 @@ func main() {
 	// play song via title or id
 	router.GET("/play/:param", playSong)
 
+	// remove sing by id or title
+	router.GET("/remove/:param", removeSong)
+
+	router.POST("/upload", uploadSong)
 	router.Run("0.0.0.0:" + PORT)
 }

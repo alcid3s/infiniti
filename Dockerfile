@@ -9,6 +9,7 @@ FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS final
 # Constant paths for the custom packages made (if more packages needed, add here).
 ENV MAINPATH=/src/main
 ENV AUDIOPIPELINEPATH=/src/audiopipeline
+ENV DATABASEPATH=/src/database
 
 # Set current directory.
 WORKDIR /src
@@ -18,6 +19,10 @@ COPY * ./
 
 # Download dependencies for Audiopipeline Package.
 WORKDIR ${AUDIOPIPELINEPATH}
+RUN go mod download -x
+
+# Download dependencies for Database Package.
+WORKDIR ${DATABASEPATH}
 RUN go mod download -x
 
 # Download dependencies for Main Package.

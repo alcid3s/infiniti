@@ -1,6 +1,8 @@
 /*
+---------------------------------------------------------------------------------------------------------------------------
 	The sourcecode for the audiopipeline has been greatly inspired by: https://github.com/Icelain/radio/blob/main/main.go
 	Many thanks to the author of the original code!
+---------------------------------------------------------------------------------------------------------------------------
 */
 
 package audiopipeline
@@ -20,7 +22,8 @@ const (
 	BUFFERSIZE = 16384
 
 	// hardcoded delay for if track length hasn't been provided correctly
-	DELAY = 150
+	DELAY         = 150
+	PRODUCTFACTOR = 8
 )
 
 type Connection struct {
@@ -74,7 +77,7 @@ func Stream(connectionPool *ConnectionPool, content []byte, track_length float32
 		ticker := time.NewTicker(time.Millisecond * DELAY)
 
 		if track_length != 0.0 {
-			timer := time.Duration(float32(time.Millisecond) * float32(track_length*float32(BUFFERSIZE)/float32(len(content))) * 4)
+			timer := time.Duration(float32(time.Millisecond) * float32(track_length*float32(BUFFERSIZE)/float32(len(content))) * PRODUCTFACTOR)
 			// log.Printf("Time: %v, Track Length: %v, Buffer Size: %v, Content Length: %v, time.Millisecond * DELAY: %v", timer, track_length, BUFFERSIZE, len(content), time.Millisecond*DELAY)
 			ticker = time.NewTicker(timer)
 		}
@@ -99,7 +102,7 @@ func GetConnectionBuffers(conn *Connection) (chan []byte, []byte) {
 	return conn.bufferChannel, conn.buffer
 }
 
-func PlayAudiofile(connPool *ConnectionPool, filetype string, c *gin.Context, image []byte) {
+func PlayAudiofile(connPool *ConnectionPool, filetype string, c *gin.Context) {
 	w := c.Writer
 
 	r := c.Request
