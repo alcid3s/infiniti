@@ -1,4 +1,4 @@
-module CNDAPI/audiopipeline
+module infiniti/audiopipeline
 
 go 1.22.0
 

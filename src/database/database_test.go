@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const PATH = "../test_songs"
+
 func createMockDB() (*gorm.DB, sqlmock.Sqlmock, error) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -54,7 +56,7 @@ func TestSeed(t *testing.T) {
 	Migrate(db)
 
 	mock.ExpectExec("INSERT INTO `songs`").WillReturnResult(sqlmock.NewResult(0, 1))
-	Seed(db, "../testSongs")
+	Seed(db, PATH)
 
 	closeDB(db)
 }
@@ -69,7 +71,7 @@ func TestGetSongById(t *testing.T) {
 	Migrate(db)
 
 	mock.ExpectExec("INSERT INTO `songs`").WillReturnResult(sqlmock.NewResult(0, 1))
-	Seed(db, "../testSongs")
+	Seed(db, PATH)
 
 	mock.ExpectExec("SELECT * FROM `songs` WHERE `songs`.`id` = 1").WillReturnResult(sqlmock.NewResult(0, 1))
 	GetSongById(db, 1)
@@ -87,7 +89,7 @@ func TestGetSongByTitle(t *testing.T) {
 	Migrate(db)
 
 	mock.ExpectExec("INSERT INTO `songs`").WillReturnResult(sqlmock.NewResult(0, 1))
-	Seed(db, "../testSongs")
+	Seed(db, PATH)
 
 	searchTerm := "summer"
 
@@ -107,7 +109,7 @@ func TestGetSongs(t *testing.T) {
 	Migrate(db)
 
 	mock.ExpectExec("INSERT INTO `songs`").WillReturnResult(sqlmock.NewResult(0, 1))
-	Seed(db, "../testSongs")
+	Seed(db, PATH)
 
 	mock.ExpectQuery("SELECT * FROM `songs`").WillReturnRows(sqlmock.NewRows([]string{"id", "title", "artist", "album", "genre", "path"}))
 	GetSongs(db)
@@ -125,10 +127,10 @@ func TestRemoveSong(t *testing.T) {
 	Migrate(db)
 
 	mock.ExpectExec("INSERT INTO `songs`").WillReturnResult(sqlmock.NewResult(0, 1))
-	Seed(db, "../testSongs")
+	Seed(db, PATH)
 
 	mock.ExpectExec("SELECT * FROM `songs` WHERE `songs`.`id` = 1").WillReturnResult(sqlmock.NewResult(0, 1))
-	RemoveSong(db, Song{ID: 1, Path: "../testSongs/Antonio Vivaldi - Summer.mp3"})
+	RemoveSong(db, Song{ID: 1, Path: PATH + "/Antonio Vivaldi - Summer.mp3"})
 
 	closeDB(db)
 }

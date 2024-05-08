@@ -1,4 +1,4 @@
-module CNDAPI/database
+module infiniti/database
 
 go 1.22.2
 

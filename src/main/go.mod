@@ -1,4 +1,4 @@
-module CNDAPI/main
+module infiniti/main
 
 go 1.22.2
 
