@@ -43,7 +43,7 @@ func Connect(username string, password string, database string) (*gorm.DB, error
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return db, err
+		return nil, err
 	}
 	return db, nil
 }
