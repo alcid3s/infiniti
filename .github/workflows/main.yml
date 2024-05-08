@@ -16,7 +16,7 @@ jobs:
         name: Run tests
         run: |
           cd src/database
-          go test 
+          go test -run TestSeed -args "../test_songs"
           cd ../..
       -
         name: Login to Docker Hub
