@@ -136,7 +136,10 @@ func GetSongs(db *gorm.DB) []Song {
 
 func RemoveSong(db *gorm.DB, song Song) error {
 	err := os.Remove(song.Path)
-	checkErrorAndExit(err)
+	if err == nil {
+		checkErrorAndPass(err)
+		return err
+	}
 
 	err = db.Delete(&Song{}, song.ID).Error
 	if err != nil {

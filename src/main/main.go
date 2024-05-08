@@ -149,29 +149,38 @@ func getSongs(c *gin.Context) {
 
 func removeSong(c *gin.Context) {
 	song, err := getSong(c)
-	checkErrorAndExit(err)
+	checkErrorAndReturn(err, c, "song not found")
 	database.RemoveSong(db, song)
 }
 
 func uploadSong(c *gin.Context) {
 	fileHeader, err := c.FormFile("file")
-	checkErrorAndExit(err)
+	checkErrorAndReturn(err, c, "file not found")
 
 	err = c.SaveUploadedFile(fileHeader, "../songs/"+fileHeader.Filename)
-	checkErrorAndExit(err)
+	checkErrorAndReturn(err, c, "couldn't save file")
 
 	file, err := os.Open(fileHeader.Filename)
-	checkErrorAndExit(err)
+	checkErrorAndReturn(err, c, "couldn't open file")
 
 	database.ParseFileToSongDatatype(db, file)
 
 	c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", fileHeader.Filename))
 }
 
+func searchSong(c *gin.Context) {
+	searchTerm := c.Param("param")
+	songs, err := database.GetSongByTitle(db, searchTerm)
+	checkErrorAndReturn(err, c, "song not found")
+
+	c.IndentedJSON(http.StatusOK, songs)
+}
+
 func main() {
 	router := gin.Default()
 	router.MaxMultipartMemory = 8 << 20
 	router.GET("/songs", getSongs)
+	router.GET("/search/:param", searchSong)
 
 	// get song via title or id
 	router.GET("/songs/:param", func(c *gin.Context) {
