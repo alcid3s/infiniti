@@ -14,7 +14,9 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-*.mp3
+songs/
+
+*songs/*.mp3
 
 *.code-workspace
 credentials.txt
