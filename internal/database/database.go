@@ -73,7 +73,9 @@ func Seed(db *gorm.DB, path string) {
 		// if file is not a directory
 		if !fileInfo.IsDir() {
 			file, err := os.Open(file.Name())
-			checkErrorAndExit(err)
+			if err != nil {
+				log.Fatal(err)
+			}
 			ParseFileToSongDatatype(db, file)
 		}
 	}
@@ -105,7 +107,7 @@ func GetSongById(db *gorm.DB, id int) (*Song, error) {
 	var song Song
 	err := db.First(&song, id).Error
 	if err != nil {
-		checkErrorAndPass(err)
+		log.Println(err)
 		return nil, err
 	}
 
@@ -118,7 +120,7 @@ func GetSongByTitle(db *gorm.DB, searchTerm string) ([]Song, error) {
 	var songs []Song
 	err := db.Where("LOWER(REPLACE(title, ' ', '')) LIKE ?", "%"+searchTerm+"%").Find(&songs).Error
 	if err != nil {
-		checkErrorAndPass(err)
+		log.Println(err)
 		return nil, err
 	}
 
@@ -129,7 +131,9 @@ func GetSongs(db *gorm.DB) []Song {
 	var songs []Song
 
 	err := db.Find(&songs).Error
-	checkErrorAndPass(err)
+	if err != nil {
+		log.Println(err)
+	}
 
 	return songs
 }
@@ -137,13 +141,11 @@ func GetSongs(db *gorm.DB) []Song {
 func RemoveSong(db *gorm.DB, song Song) error {
 	err := os.Remove(song.Path)
 	if err == nil {
-		checkErrorAndPass(err)
 		return err
 	}
 
 	err = db.Delete(&Song{}, song.ID).Error
 	if err != nil {
-		checkErrorAndPass(err)
 		return err
 	}
 
@@ -153,7 +155,6 @@ func RemoveSong(db *gorm.DB, song Song) error {
 func AddSong(db *gorm.DB, song Song) error {
 	err := db.Create(&song).Error
 	if err != nil {
-		checkErrorAndPass(err)
 		return err
 	}
 

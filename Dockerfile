@@ -6,34 +6,19 @@ ARG PORT=9000
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS final
 
-# Constant paths for the custom packages made (if more packages needed, add here).
-ENV MAINPATH=/src/main
-ENV AUDIOPIPELINEPATH=/src/audiopipeline
-ENV DATABASEPATH=/src/database
+ENV MAINPATH=/src
 
-# Set current directory.
-WORKDIR /src
-
-# Copy project into image.
-COPY * ./
-
-# Download dependencies for Audiopipeline Package.
-WORKDIR ${AUDIOPIPELINEPATH}
-RUN go mod download -x
-
-# Download dependencies for Database Package.
-WORKDIR ${DATABASEPATH}
-RUN go mod download -x
-
-# Download dependencies for Main Package.
 WORKDIR ${MAINPATH}
+
+COPY go.mod go.sum ./
 RUN go mod download -x
 
-# Create a build for the application.
+COPY . .
+
+WORKDIR /src/cmd/main
+
 RUN CGO_ENABLED=0 GOOS=linux go build -o /src/bin/infiniti
 
-# Expose port 8080 to the outside world.
 EXPOSE ${PORT}
 
-# Command ran when the container is started.
-CMD [ "/src/bin/infiniti" ]
+CMD ["/src/bin/infiniti"]

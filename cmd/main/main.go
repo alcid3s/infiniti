@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
-
-	"infiniti/audiopipeline"
-	"infiniti/database"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/tcolgate/mp3"
 	"gorm.io/gorm"
+
+	"infiniti.com/internal/audiopipeline"
+	"infiniti.com/internal/database"
 )
 
 var db *gorm.DB
@@ -41,18 +41,25 @@ func checkErrorAndReturn(err error, c *gin.Context, message string) {
 }
 
 func init() {
-	file, err := os.Open("credentials.txt")
+	err := godotenv.Load("/src/.env")
 	checkErrorAndExit(err)
 
-	contents, err := io.ReadAll(file)
-	checkErrorAndExit(err)
+	dbHost := os.Getenv("DB_HOST")
+	dbPass := os.Getenv("DB_PASS")
+	dbName := os.Getenv("DB_NAME")
 
-	credentials := strings.Split(string(contents), ":")
+	fmt.Println("Connecting to database...", dbHost, dbPass, dbName)
 
-	db, err = database.Connect(credentials[0], credentials[1], credentials[2])
+	wd, _ := os.Getwd()
+	fmt.Println("Working directory:", wd)
+
+	dir, _ := os.ReadDir(wd)
+	fmt.Println("Files in working directory:", dir)
+
+	db, err = database.Connect(dbHost, dbPass, dbName)
 	checkErrorAndExit(err)
 	database.Migrate(db)
-	database.Seed(db, "../songs")
+	database.Seed(db, "../../resources/songs")
 }
 
 // source: https://stackoverflow.com/questions/60281655/how-to-find-the-length-of-mp3-file-in-golang
@@ -122,7 +129,10 @@ func readSongContents(file *os.File) ([]byte, error) {
 
 func playSong(c *gin.Context) {
 	song, err := getSong(c)
-	checkErrorAndReturn(err, c, "song not found")
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
+		return
+	}
 
 	connPool := audiopipeline.NewConnectionPool()
 
@@ -149,8 +159,18 @@ func getSongs(c *gin.Context) {
 
 func removeSong(c *gin.Context) {
 	song, err := getSong(c)
-	checkErrorAndReturn(err, c, "song not found")
-	database.RemoveSong(db, song)
+	fmt.Println("song:", song, "err:", err)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
+	} else {
+		c.IndentedJSON(http.StatusOK, song)
+		err = database.RemoveSong(db, song)
+		if err != nil {
+			log.Println(err)
+		}
+		database.RemoveSong(db, song)
+
+	}
 }
 
 func uploadSong(c *gin.Context) {
@@ -185,11 +205,16 @@ func main() {
 	// get song via title or id
 	router.GET("/songs/:param", func(c *gin.Context) {
 		song, err := getSong(c)
+
 		if err != nil {
 			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "song not found"})
 		} else {
 			c.IndentedJSON(http.StatusOK, song)
 		}
+	})
+
+	router.GET("/", func(c *gin.Context) {
+		c.String(http.StatusOK, "Welcome to Infiniti! \n\nAvailable endpoints: \n\nGET /songs \nGET /songs/:param \nGET /search/:param \nGET /play/:param \nGET /remove/:param \nPOST /upload \n\nEnjoy!")
 	})
 
 	// play song via title or id
