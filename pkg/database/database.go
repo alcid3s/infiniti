@@ -9,6 +9,7 @@ import (
 	"github.com/dhowden/tag"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"infiniti.com/pkg/models"
 )
 
 const (
@@ -29,14 +30,6 @@ func checkErrorAndPass(err error) {
 	}
 }
 
-type Song struct {
-	ID       uint   `gorm:"primaryKey"`
-	Title    string `gorm:"unique"`
-	FileType string
-	Artist   string
-	Path     string
-}
-
 func Connect(username string, password string, database string) (*gorm.DB, error) {
 	dsn := username + ":" + password + "@tcp(db:3306)/" + database + "?charset=utf8mb4&parseTime=True&loc=Local"
 	fmt.Println(colorRed + "DSN: " + dsn + colorReset)
@@ -49,7 +42,7 @@ func Connect(username string, password string, database string) (*gorm.DB, error
 }
 
 func Migrate(db *gorm.DB) {
-	err := db.AutoMigrate(&Song{})
+	err := db.AutoMigrate(&models.Song{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -85,7 +78,7 @@ func ParseFileToSongDatatype(db *gorm.DB, file *os.File) {
 	// reading metadata from the file
 	m, err := tag.ReadFrom(file)
 	if err == nil {
-		if (db.Where("title = ?", strings.Split(file.Name(), ".")[0]).First(&Song{}).Error != nil) {
+		if (db.Where("title = ?", strings.Split(file.Name(), ".")[0]).First(&models.Song{}).Error != nil) {
 			// save position of extension
 			extensionsPosition := len(strings.Split(file.Name(), ".")) - 1
 
@@ -93,7 +86,7 @@ func ParseFileToSongDatatype(db *gorm.DB, file *os.File) {
 			title := strings.Join(strings.Split(file.Name(), ".")[:extensionsPosition], ".")
 
 			// adding song to database
-			AddSong(db, Song{
+			AddSong(db, models.Song{
 				Title:    title,
 				FileType: strings.Split(file.Name(), ".")[extensionsPosition],
 				Artist:   m.Artist(),
@@ -103,8 +96,8 @@ func ParseFileToSongDatatype(db *gorm.DB, file *os.File) {
 	}
 }
 
-func GetSongById(db *gorm.DB, id int) (*Song, error) {
-	var song Song
+func GetSongById(db *gorm.DB, id int) (*models.Song, error) {
+	var song models.Song
 	err := db.First(&song, id).Error
 	if err != nil {
 		log.Println(err)
@@ -114,10 +107,10 @@ func GetSongById(db *gorm.DB, id int) (*Song, error) {
 	return &song, nil
 }
 
-func GetSongByTitle(db *gorm.DB, searchTerm string) ([]Song, error) {
+func GetSongByTitle(db *gorm.DB, searchTerm string) ([]models.Song, error) {
 	searchTerm = strings.ToLower(strings.ReplaceAll(searchTerm, " ", ""))
 
-	var songs []Song
+	var songs []models.Song
 	err := db.Where("LOWER(REPLACE(title, ' ', '')) LIKE ?", "%"+searchTerm+"%").Find(&songs).Error
 	if err != nil {
 		log.Println(err)
@@ -127,8 +120,8 @@ func GetSongByTitle(db *gorm.DB, searchTerm string) ([]Song, error) {
 	return songs, nil
 }
 
-func GetSongs(db *gorm.DB) []Song {
-	var songs []Song
+func GetSongs(db *gorm.DB) []models.Song {
+	var songs []models.Song
 
 	err := db.Find(&songs).Error
 	if err != nil {
@@ -138,13 +131,13 @@ func GetSongs(db *gorm.DB) []Song {
 	return songs
 }
 
-func RemoveSong(db *gorm.DB, song Song) error {
+func RemoveSong(db *gorm.DB, song models.Song) error {
 	err := os.Remove(song.Path)
 	if err == nil {
 		return err
 	}
 
-	err = db.Delete(&Song{}, song.ID).Error
+	err = db.Delete(&models.Song{}, song.ID).Error
 	if err != nil {
 		return err
 	}
@@ -152,7 +145,7 @@ func RemoveSong(db *gorm.DB, song Song) error {
 	return nil
 }
 
-func AddSong(db *gorm.DB, song Song) error {
+func AddSong(db *gorm.DB, song models.Song) error {
 	err := db.Create(&song).Error
 	if err != nil {
 		return err

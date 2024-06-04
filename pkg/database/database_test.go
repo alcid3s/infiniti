@@ -7,6 +7,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"infiniti.com/pkg/models"
 )
 
 const PATH = "../test_songs"
@@ -130,7 +131,7 @@ func TestRemoveSong(t *testing.T) {
 	Seed(db, PATH)
 
 	mock.ExpectExec("SELECT * FROM `songs` WHERE `songs`.`id` = 1").WillReturnResult(sqlmock.NewResult(0, 1))
-	RemoveSong(db, Song{ID: 1, Path: PATH + "/Recording.mp3"})
+	RemoveSong(db, models.Song{ID: 1, Path: PATH + "/Recording.mp3"})
 
 	closeDB(db)
 }
