@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 	"infiniti.com/pkg/database"
+	song_handler "infiniti.com/pkg/handles"
 	"infiniti.com/pkg/routes"
 )
 
@@ -34,9 +35,10 @@ func init() {
 
 	database.Migrate(db)
 	database.Seed(db, "../../resources/songs")
+	song_handler.Init(db)
 }
 
 func main() {
-	router := routes.SetupRouter(db)
+	router := routes.SetupRouter()
 	router.Run("0.0.0.0:" + PORT)
 }

@@ -10,7 +10,7 @@ import (
 	"infiniti.com/pkg/models"
 )
 
-const PATH = "../test_songs"
+const PATH = "../../resources/test_songs"
 
 func createMockDB() (*gorm.DB, sqlmock.Sqlmock, error) {
 	db, mock, err := sqlmock.New()
