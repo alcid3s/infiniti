@@ -24,12 +24,6 @@ func checkErrorAndExit(err error) {
 	}
 }
 
-func checkErrorAndPass(err error) {
-	if err != nil {
-		log.Print(err)
-	}
-}
-
 func Connect(username string, password string, database string) (*gorm.DB, error) {
 	dsn := username + ":" + password + "@tcp(db:3306)/" + database + "?charset=utf8mb4&parseTime=True&loc=Local"
 	fmt.Println(colorRed + "DSN: " + dsn + colorReset)
@@ -109,6 +103,8 @@ func GetSongById(db *gorm.DB, id int) (*models.Song, error) {
 
 func GetSongByTitle(db *gorm.DB, searchTerm string) ([]models.Song, error) {
 	searchTerm = strings.ToLower(strings.ReplaceAll(searchTerm, " ", ""))
+
+	fmt.Println("Searching for: ", searchTerm)
 
 	var songs []models.Song
 	err := db.Where("LOWER(REPLACE(title, ' ', '')) LIKE ?", "%"+searchTerm+"%").Find(&songs).Error

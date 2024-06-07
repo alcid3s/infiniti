@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/tcolgate/mp3"
 	"gorm.io/gorm"
-	"infiniti.com/pkg/audiopipeline"
-	"infiniti.com/pkg/database"
+	"infiniti.com/internal/audiopipeline"
+	"infiniti.com/internal/database"
 	"infiniti.com/pkg/models"
 )
 

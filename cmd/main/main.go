@@ -6,13 +6,10 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"gorm.io/gorm"
-	"infiniti.com/pkg/database"
+	"infiniti.com/internal/database"
 	song_handler "infiniti.com/pkg/handles"
 	"infiniti.com/pkg/routes"
 )
-
-var db *gorm.DB
 
 const PORT = "9000"
 
@@ -28,7 +25,7 @@ func init() {
 
 	fmt.Println("Connecting to database...", dbHost, dbPass, dbName)
 
-	db, err = database.Connect(dbHost, dbPass, dbName)
+	db, err := database.Connect(dbHost, dbPass, dbName)
 	if err != nil {
 		log.Fatal("Error connecting to database, err: ", err)
 	}
