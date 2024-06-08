@@ -13,9 +13,11 @@ WORKDIR ${MAINPATH}
 COPY go.mod go.sum ./
 RUN go mod download -x
 
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+
 COPY . .
 
-WORKDIR /src/cmd/main
+RUN swag init
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /src/bin/infiniti
 

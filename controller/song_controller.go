@@ -1,4 +1,4 @@
-package song_handler
+package controller
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 	"infiniti.com/internal/audiopipeline"
 	"infiniti.com/internal/database"
-	"infiniti.com/pkg/models"
+	model "infiniti.com/model"
 )
 
 var db *gorm.DB
@@ -122,7 +122,7 @@ func SearchSong(c *gin.Context) {
 	Private functions
 **/
 
-func getSong(c *gin.Context) (models.Song, error) {
+func getSong(c *gin.Context) (model.Song, error) {
 	param := c.Param("param")
 
 	id, succes := strconv.Atoi(param)
@@ -131,14 +131,14 @@ func getSong(c *gin.Context) (models.Song, error) {
 		if err == nil {
 			return *song, nil
 		}
-		return models.Song{}, err
+		return model.Song{}, err
 	} else {
 		songs, err := database.GetSongByTitle(db, param)
 		if err == nil && len(songs) > 0 {
 			return songs[0], nil
 		}
 		err = fmt.Errorf("song not found")
-		return models.Song{}, err
+		return model.Song{}, err
 	}
 }
 
@@ -171,7 +171,7 @@ func calculatePlayLength(path string) float64 {
 	return t
 }
 
-func openFile(song models.Song) (*os.File, error) {
+func openFile(song model.Song) (*os.File, error) {
 	fname := "../songs/" + song.Path
 	file, err := os.Open(fname)
 	if err != nil {

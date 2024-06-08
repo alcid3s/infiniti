@@ -9,7 +9,7 @@ import (
 	"github.com/dhowden/tag"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"infiniti.com/pkg/models"
+	model "infiniti.com/model"
 )
 
 const (
@@ -36,7 +36,7 @@ func Connect(username string, password string, database string) (*gorm.DB, error
 }
 
 func Migrate(db *gorm.DB) {
-	err := db.AutoMigrate(&models.Song{})
+	err := db.AutoMigrate(&model.Song{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func ParseFileToSongDatatype(db *gorm.DB, file *os.File) {
 	// reading metadata from the file
 	m, err := tag.ReadFrom(file)
 	if err == nil {
-		if (db.Where("title = ?", strings.Split(file.Name(), ".")[0]).First(&models.Song{}).Error != nil) {
+		if (db.Where("title = ?", strings.Split(file.Name(), ".")[0]).First(&model.Song{}).Error != nil) {
 			// save position of extension
 			extensionsPosition := len(strings.Split(file.Name(), ".")) - 1
 
@@ -80,7 +80,7 @@ func ParseFileToSongDatatype(db *gorm.DB, file *os.File) {
 			title := strings.Join(strings.Split(file.Name(), ".")[:extensionsPosition], ".")
 
 			// adding song to database
-			AddSong(db, models.Song{
+			AddSong(db, model.Song{
 				Title:    title,
 				FileType: strings.Split(file.Name(), ".")[extensionsPosition],
 				Artist:   m.Artist(),
@@ -90,8 +90,8 @@ func ParseFileToSongDatatype(db *gorm.DB, file *os.File) {
 	}
 }
 
-func GetSongById(db *gorm.DB, id int) (*models.Song, error) {
-	var song models.Song
+func GetSongById(db *gorm.DB, id int) (*model.Song, error) {
+	var song model.Song
 	err := db.First(&song, id).Error
 	if err != nil {
 		log.Println(err)
@@ -101,12 +101,12 @@ func GetSongById(db *gorm.DB, id int) (*models.Song, error) {
 	return &song, nil
 }
 
-func GetSongByTitle(db *gorm.DB, searchTerm string) ([]models.Song, error) {
+func GetSongByTitle(db *gorm.DB, searchTerm string) ([]model.Song, error) {
 	searchTerm = strings.ToLower(strings.ReplaceAll(searchTerm, " ", ""))
 
 	fmt.Println("Searching for: ", searchTerm)
 
-	var songs []models.Song
+	var songs []model.Song
 	err := db.Where("LOWER(REPLACE(title, ' ', '')) LIKE ?", "%"+searchTerm+"%").Find(&songs).Error
 	if err != nil {
 		log.Println(err)
@@ -116,8 +116,8 @@ func GetSongByTitle(db *gorm.DB, searchTerm string) ([]models.Song, error) {
 	return songs, nil
 }
 
-func GetSongs(db *gorm.DB) []models.Song {
-	var songs []models.Song
+func GetSongs(db *gorm.DB) []model.Song {
+	var songs []model.Song
 
 	err := db.Find(&songs).Error
 	if err != nil {
@@ -127,13 +127,13 @@ func GetSongs(db *gorm.DB) []models.Song {
 	return songs
 }
 
-func RemoveSong(db *gorm.DB, song models.Song) error {
+func RemoveSong(db *gorm.DB, song model.Song) error {
 	err := os.Remove(song.Path)
 	if err == nil {
 		return err
 	}
 
-	err = db.Delete(&models.Song{}, song.ID).Error
+	err = db.Delete(&model.Song{}, song.ID).Error
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func RemoveSong(db *gorm.DB, song models.Song) error {
 	return nil
 }
 
-func AddSong(db *gorm.DB, song models.Song) error {
+func AddSong(db *gorm.DB, song model.Song) error {
 	err := db.Create(&song).Error
 	if err != nil {
 		return err
