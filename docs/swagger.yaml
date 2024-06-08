@@ -1,0 +1,15 @@
+host: 127.0.0.1:9000
+info:
+  contact: {}
+  description: This is a simple API for a music streaming service.
+  title: Infiniti API
+  version: "1.0"
+paths:
+  /testDocs:
+    get:
+      description: Test the docs route
+      produces:
+      - application/json
+      responses: {}
+      summary: Test docs
+swagger: "2.0"
